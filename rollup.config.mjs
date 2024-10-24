@@ -5,7 +5,7 @@ import cleaner from "rollup-plugin-cleaner";
 import {terser} from "rollup-plugin-terser";
 
 export default {
-    input: "src/index.ts",
+    input: "src/client.ts",
     output: [
         {
             file: "dist/index.js",
