@@ -1,3 +1,5 @@
+import WebSocket from "ws";
+
 interface Options {
     timeout?: number;       // 连接超时时间，默认 5s
     reconnect?: boolean;    // 是否重连，默认为 true
@@ -18,21 +20,20 @@ interface sendMessageQueueItem {
     callback?: MessageCallback
 }
 
-export default class ClientWs {
-    static #instance: ClientWs;
+export default class ServerWs {
+    static #instance: ServerWs;
     #url: string;
     #ws: null | WebSocket = null;
     #options: Required<Options>;
     readonly #eventListeners: Record<string, SocketEventListener[]> = {};  // 事件监听器  {open: [listener1, listener2]}
     readonly #messageCache: { data: any; callback?: MessageCallback }[] = [];  // 在没有连接的时候缓存消息
     #reconnectAttempts: number = 0;     // 重连次数
-    #reconnectTimeout: number | null = null;  // 重连定时器
+    #reconnectTimeout: ReturnType<typeof setTimeout> | null = null;  // 重连定时器
     readonly #sendMessageQueue: Record<string, sendMessageQueueItem> = {};  // 等待发送的消息队列
     #isHandleClose: boolean = false;  // 是否手动关闭的连接
     #timeoutTimerId: ReturnType<typeof setTimeout> | null = null;
 
     constructor(url: string, options?: Options) {
-        if (!("WebSocket" in window)) throw new Error("WebSocket is not supported");
         if (!url) throw new Error("url is required");
         this.#url = url;
         this.#options = {
@@ -49,11 +50,12 @@ export default class ClientWs {
     }
 
     static getInstance(url: string, options?: Options) {
-        if (!ClientWs.#instance) {
-            ClientWs.#instance = new ClientWs(url, options);
+        if (!ServerWs.#instance) {
+            ServerWs.#instance = new ServerWs(url, options);
         }
         return this.#instance;
     }
+
 
     connect() {
         this.#ws = new WebSocket(this.#url, this.#options.protocols);
@@ -61,11 +63,11 @@ export default class ClientWs {
         this.#timeoutHandle();
     }
 
-    setBinaryType(binaryType: "blob" | "arraybuffer") {
-        if (this.#ws) {
-            this.#ws.binaryType = binaryType;
-        }
-    }
+    // setBinaryType(binaryType: "blob" | "arraybuffer") {
+    //     if (this.#ws) {
+    //         this.#ws.binaryType = binaryType;
+    //     }
+    // }
 
     #timeoutHandle() {
         if (this.#options.timeout) {
@@ -93,10 +95,10 @@ export default class ClientWs {
             this.#ws = new WebSocket(this.#url, this.#options.protocols);
             this.bindEvents();
             this.#reconnectAttempts++;
-        };
+        }
 
         if (immediate) {
-            reconnectEvent();
+            reconnectEvent()
             this.#timeoutHandle();
             return;
         }
@@ -114,29 +116,29 @@ export default class ClientWs {
         this.#ws?.addEventListener("error", this.errorHandler.bind(this));
     }
 
-    private openHandler(event: Event) {
+    private openHandler(event: WebSocket.WebSocketEventMap["open"]) {
         if (this.#isHandleClose) this.#isHandleClose = false;
         this.#reconnectAttempts = 0;
         this.emit("open", event);
         this.sendCachedMessages();
     }
 
-    private closeHandler(event: CloseEvent) {
+    private closeHandler(event: WebSocket.WebSocketEventMap["close"]) {
         this.emit("close", event);
         // 如果设置了重连,并且不是手动关闭的连接,则重连
         if (this.#options.reconnect && !this.#isHandleClose) this.reconnect();
     }
 
-    private errorHandler(event: Event) {
+    private errorHandler(event: WebSocket.WebSocketEventMap["error"]) {
         if (this.#timeoutTimerId !== null) clearTimeout(this.#timeoutTimerId);
         this.emit("error", event);
     }
 
-    private messageHandler(event: MessageEvent) {
+    private messageHandler(event: WebSocket.WebSocketEventMap["message"]) {
         this.emit("message", event);
         let jsonData: any;
         try {
-            jsonData = JSON.parse(event.data);
+            jsonData = JSON.parse(typeof event.data === "string" ? event.data : "");
         } catch {
             return;
         }
@@ -164,7 +166,7 @@ export default class ClientWs {
     on(event: "close", listener: SocketEventListener<CloseEvent>): void;
     on(event: "message", listener: SocketEventListener<MessageEvent>): void;
     on(event: "error", listener: SocketEventListener<Event>): void;
-    on(event: "open"|"close"|"error"|"message", listener: SocketEventListener) {
+    on(event: "open" | "close" | "error" | "message", listener: SocketEventListener) {
         if (["open", "close", "message", "error"].indexOf(event) === -1) {
             throw new Error(`Event "${event}" is not supported`);
         }
@@ -182,7 +184,7 @@ export default class ClientWs {
     once(event: "close", listener: SocketEventListener<CloseEvent>): void;
     once(event: "message", listener: SocketEventListener): void;
     once(event: "error", listener: SocketEventListener<Event>): void;
-    once(event: "open"|"close"|"error"|"message", listener: SocketEventListener) {
+    once(event: "open" | "close" | "error" | "message", listener: SocketEventListener) {
         if (["open", "close", "message", "error"].indexOf(event) === -1) {
             throw new Error(`Event "${event}" is not supported`);
         }
@@ -263,7 +265,7 @@ export default class ClientWs {
         this.#ws?.close();
     }
 
-    removeListener(event: "open"|"close"|"error"|"message") {
+    removeListener(event: "open" | "close" | "error" | "message") {
         delete this.#eventListeners[event];
     }
 
