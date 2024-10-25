@@ -1,31 +1,12 @@
-import WebSocket from "ws";
+import WebSocket, {RawData} from "ws";
+import {MessageCallback, Options, sendMessageQueueItem} from "./type";
 
-interface Options {
-    timeout?: number;       // 连接超时时间，默认 5s
-    reconnect?: boolean;    // 是否重连，默认为 true
-    reconnectInterval?: number;  // 重连间隔，默认 5s
-    reconnectMaxInterval?: number;  // 最大重连间隔，10s
-    reconnectMaxTimes?: number;  // 最大重连次数，默认为 0 不限制链接次数
-    uniqueKey?: string;        // 每条消息携带一个唯一的key,用于标识这条消息，默认值为 message_id
-    cacheMessage?: boolean;   // 是否缓存发送失败的消息，待连接成功后在发送，默认为 false
-    maxCacheMessage?: number    // 缓存消息的最大数量，默认值为 100
-    protocols?: string | string[]
-}
-
-type MessageCallback<R = any> = (error: Error | null, data: R) => void;
-type SocketEventListener<T = any> = (data: T) => void;
-
-interface sendMessageQueueItem {
-    message: string,
-    callback?: MessageCallback
-}
-
-export default class ServerWs {
-    static #instance: ServerWs;
+export default class WebSocketServer {
+    static #instance: WebSocketServer;
     #url: string;
     #ws: null | WebSocket = null;
     #options: Required<Options>;
-    readonly #eventListeners: Record<string, SocketEventListener[]> = {};  // 事件监听器  {open: [listener1, listener2]}
+    readonly #eventListeners: Record<string, Function[]> = {};  // 事件监听器  {open: [listener1, listener2]}
     readonly #messageCache: { data: any; callback?: MessageCallback }[] = [];  // 在没有连接的时候缓存消息
     #reconnectAttempts: number = 0;     // 重连次数
     #reconnectTimeout: ReturnType<typeof setTimeout> | null = null;  // 重连定时器
@@ -50,24 +31,18 @@ export default class ServerWs {
     }
 
     static getInstance(url: string, options?: Options) {
-        if (!ServerWs.#instance) {
-            ServerWs.#instance = new ServerWs(url, options);
+        if (!WebSocketServer.#instance) {
+            WebSocketServer.#instance = new WebSocketServer(url, options);
         }
         return this.#instance;
     }
 
-
     connect() {
         this.#ws = new WebSocket(this.#url, this.#options.protocols);
-        this.bindEvents();
+        this.#bindEvents();
         this.#timeoutHandle();
+        return this;
     }
-
-    // setBinaryType(binaryType: "blob" | "arraybuffer") {
-    //     if (this.#ws) {
-    //         this.#ws.binaryType = binaryType;
-    //     }
-    // }
 
     #timeoutHandle() {
         if (this.#options.timeout) {
@@ -75,14 +50,14 @@ export default class ServerWs {
                 if (this.#isHandleClose) return;
                 if (this.#ws && this.#ws.readyState !== WebSocket.OPEN) {
                     this.#ws.close();
-                    this.emit("error", new Event("connection timeout"));
-                    if (this.#options.reconnect) this.reconnect(true);
+                    this.#emit("error", new Error("connection timeout"));
+                    if (this.#options.reconnect) this.#reconnect(true);
                 }
             }, this.#options.timeout);
         }
     }
 
-    private reconnect(immediate: boolean = false) {
+    #reconnect(immediate: boolean = false) {
         if (!this.#ws) return;
 
         if (this.#options.reconnectMaxTimes && (this.#reconnectAttempts >= this.#options.reconnectMaxTimes)) {
@@ -93,12 +68,12 @@ export default class ServerWs {
 
         const reconnectEvent = () => {
             this.#ws = new WebSocket(this.#url, this.#options.protocols);
-            this.bindEvents();
+            this.#bindEvents();
             this.#reconnectAttempts++;
-        }
+        };
 
         if (immediate) {
-            reconnectEvent()
+            reconnectEvent();
             this.#timeoutHandle();
             return;
         }
@@ -109,36 +84,35 @@ export default class ServerWs {
         this.#reconnectTimeout = setTimeout(reconnectEvent, exponentialBackoff);
     }
 
-    private bindEvents() {
-        this.#ws?.addEventListener("open", this.openHandler.bind(this));
-        this.#ws?.addEventListener("close", this.closeHandler.bind(this));
-        this.#ws?.addEventListener("message", this.messageHandler.bind(this));
-        this.#ws?.addEventListener("error", this.errorHandler.bind(this));
+    #bindEvents() {
+        this.#ws?.on("open", () => this.#openHandler(this));
+        this.#ws?.on("close", (code: number, reason: Buffer) => this.#closeHandler.call(this, code, reason));
+        this.#ws?.on("message", (data: RawData, isBinary: boolean) => this.#messageHandler.call(this, data, isBinary));
+        this.#ws?.on("error", (err: Error) => this.#errorHandler.call(this, err));
     }
 
-    private openHandler(event: WebSocket.WebSocketEventMap["open"]) {
+    #openHandler(event: WebSocketServer) {
         if (this.#isHandleClose) this.#isHandleClose = false;
         this.#reconnectAttempts = 0;
-        this.emit("open", event);
-        this.sendCachedMessages();
+        this.#emit("open", event);
+        this.#sendCachedMessages();
     }
 
-    private closeHandler(event: WebSocket.WebSocketEventMap["close"]) {
-        this.emit("close", event);
-        // 如果设置了重连,并且不是手动关闭的连接,则重连
-        if (this.#options.reconnect && !this.#isHandleClose) this.reconnect();
-    }
-
-    private errorHandler(event: WebSocket.WebSocketEventMap["error"]) {
+    #errorHandler(event: Error) {
         if (this.#timeoutTimerId !== null) clearTimeout(this.#timeoutTimerId);
-        this.emit("error", event);
+        this.#emit("error", event);
     }
 
-    private messageHandler(event: WebSocket.WebSocketEventMap["message"]) {
-        this.emit("message", event);
+    #closeHandler(code: number, reason: Buffer) {
+        this.#emit("close", code, reason);
+        if (this.#options.reconnect && !this.#isHandleClose) this.#reconnect();
+    }
+
+    #messageHandler(buffer: RawData, isBinary: boolean) {
+        this.#emit("message", buffer, isBinary);
         let jsonData: any;
         try {
-            jsonData = JSON.parse(typeof event.data === "string" ? event.data : "");
+            jsonData = JSON.parse(buffer.toString("utf-8"));
         } catch {
             return;
         }
@@ -155,18 +129,23 @@ export default class ServerWs {
         }
     }
 
-    private emit(event: string, data: any) {
+    #emit(event: "open" | "close" | "error" | "message", data: any): void;
+    #emit(event: "open", data: WebSocketServer): void;
+    #emit(event: "close", code: number, reason: Buffer): void;
+    #emit(event: "message", data: RawData, isBinary: boolean): void;
+    #emit(event: "error", err: Error): void;
+    #emit(event: "open" | "close" | "error" | "message", ...args: any[]) {
         const listeners = this.#eventListeners[event];
         if (listeners && listeners.length > 0) {
-            listeners.forEach((listener) => listener(data));
+            listeners.forEach((listener) => listener(...args));
         }
     }
 
-    on(event: "open" | "close" | "error" | "message", listener: SocketEventListener<Event>): void;
-    on(event: "close", listener: SocketEventListener<CloseEvent>): void;
-    on(event: "message", listener: SocketEventListener<MessageEvent>): void;
-    on(event: "error", listener: SocketEventListener<Event>): void;
-    on(event: "open" | "close" | "error" | "message", listener: SocketEventListener) {
+    on(event: "open" | "close" | "error" | "message", listener: (instance: WebSocketServer) => void): this;
+    on(event: "close", listener: (instance: WebSocketServer, code: number, reason: Buffer) => void): this;
+    on(event: "message", listener: (instance: WebSocketServer, data: RawData, isBinary: boolean) => void): this;
+    on(event: "error", listener: (instance: WebSocketServer, err: Error) => void): this;
+    on(event: "open" | "close" | "error" | "message", listener: Function) {
         if (["open", "close", "message", "error"].indexOf(event) === -1) {
             throw new Error(`Event "${event}" is not supported`);
         }
@@ -178,33 +157,34 @@ export default class ServerWs {
         if (!this.#eventListeners[event].includes(listener)) {
             this.#eventListeners[event].push(listener);
         }
+        return this;
     }
 
-    once(event: "open", listener: SocketEventListener<Event>): void;
-    once(event: "close", listener: SocketEventListener<CloseEvent>): void;
-    once(event: "message", listener: SocketEventListener): void;
-    once(event: "error", listener: SocketEventListener<Event>): void;
-    once(event: "open" | "close" | "error" | "message", listener: SocketEventListener) {
+    once(event: "open" | "close" | "error" | "message", listener: (instance: WebSocketServer,) => void): void;
+    once(event: "close", listener: (instance: WebSocketServer, code: number, reason: Buffer) => void): void;
+    once(event: "message", listener: (instance: WebSocketServer, data: RawData, isBinary: boolean) => void): void;
+    once(event: "error", listener: (instance: WebSocketServer, err: Error) => void): void;
+    once(event: "open" | "close" | "error" | "message", listener: any) {
         if (["open", "close", "message", "error"].indexOf(event) === -1) {
             throw new Error(`Event "${event}" is not supported`);
         }
-
-        const onceListener: SocketEventListener = (data) => {
+        const onceListener: any = (data: any) => {
             listener(data);
-            this.off(event, onceListener);
+            this.#off(event, onceListener);
         };
 
         this.on(event, onceListener);
+        return this;
     }
 
-    private off(event: string, listener: SocketEventListener) {
+    #off(event: string, listener: Function) {
         const listeners = this.#eventListeners[event];
         if (listeners) {
             this.#eventListeners[event] = listeners.filter((l) => l !== listener);
         }
     }
 
-    private sendCachedMessages() {
+    #sendCachedMessages() {
         let index = 0;
         const sendNextMessage = () => {
             if (index < this.#messageCache.length) {
@@ -226,13 +206,16 @@ export default class ServerWs {
             } else {
                 this.#messageCache.shift();
                 this.#messageCache.push({data, callback});
-                // console.warn(`消息缓存已满,保留最新的${this.options.maxCacheMessage}条消息`);
             }
-            // console.warn('websocket 未连接,消息已缓存,等待连接后发送,目前缓存消息数：' + this.messageCache.length + '条');
         }
 
         if (!this.#ws || this.#ws.readyState !== WebSocket.OPEN) {
             callback?.(new Error("websocket 未连接"), null as R);
+            return;
+        }
+
+        if (Buffer.isBuffer(data)) {
+            this.#ws.send(data);
             return;
         }
 

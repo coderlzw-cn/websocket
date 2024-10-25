@@ -1,32 +1,14 @@
-interface Options {
-    timeout?: number;       // 连接超时时间，默认 5s
-    reconnect?: boolean;    // 是否重连，默认为 true
-    reconnectInterval?: number;  // 重连间隔，默认 5s
-    reconnectMaxInterval?: number;  // 最大重连间隔，10s
-    reconnectMaxTimes?: number;  // 最大重连次数，默认为 0 不限制链接次数
-    uniqueKey?: string;        // 每条消息携带一个唯一的key,用于标识这条消息，默认值为 message_id
-    cacheMessage?: boolean;   // 是否缓存发送失败的消息，待连接成功后在发送，默认为 false
-    maxCacheMessage?: number    // 缓存消息的最大数量，默认值为 100
-    protocols?: string | string[]
-}
+import {MessageCallback, Options, sendMessageQueueItem} from "./type";
 
-type MessageCallback<R = any> = (error: Error | null, data: R) => void;
-type SocketEventListener<T = any> = (data: T) => void;
-
-interface sendMessageQueueItem {
-    message: string,
-    callback?: MessageCallback
-}
-
-export default class ClientWs {
-    static #instance: ClientWs;
+export default class WebSocketClient {
+    static #instance: WebSocketClient;
     #url: string;
     #ws: null | WebSocket = null;
     #options: Required<Options>;
-    readonly #eventListeners: Record<string, SocketEventListener[]> = {};  // 事件监听器  {open: [listener1, listener2]}
+    readonly #eventListeners: Record<string, Function[]> = {};  // 事件监听器  {open: [listener1, listener2]}
     readonly #messageCache: { data: any; callback?: MessageCallback }[] = [];  // 在没有连接的时候缓存消息
     #reconnectAttempts: number = 0;     // 重连次数
-    #reconnectTimeout: number | null = null;  // 重连定时器
+    #reconnectTimeoutTimerId: ReturnType<typeof setTimeout> | null = null;  // 重连定时器
     readonly #sendMessageQueue: Record<string, sendMessageQueueItem> = {};  // 等待发送的消息队列
     #isHandleClose: boolean = false;  // 是否手动关闭的连接
     #timeoutTimerId: ReturnType<typeof setTimeout> | null = null;
@@ -49,23 +31,20 @@ export default class ClientWs {
     }
 
     static getInstance(url: string, options?: Options) {
-        if (!ClientWs.#instance) {
-            ClientWs.#instance = new ClientWs(url, options);
+        if (!WebSocketClient.#instance) {
+            WebSocketClient.#instance = new WebSocketClient(url, options);
         }
         return this.#instance;
     }
 
-
     connect() {
         this.#ws = new WebSocket(this.#url, this.#options.protocols);
-        this.bindEvents();
+        this.#bindEvents();
         this.#timeoutHandle();
     }
 
     setBinaryType(binaryType: "blob" | "arraybuffer") {
-        if (this.#ws) {
-            this.#ws.binaryType = binaryType;
-        }
+        if (this.#ws) this.#ws.binaryType = binaryType;
     }
 
     #timeoutHandle() {
@@ -74,30 +53,30 @@ export default class ClientWs {
                 if (this.#isHandleClose) return;
                 if (this.#ws && this.#ws.readyState !== WebSocket.OPEN) {
                     this.#ws.close();
-                    this.emit("error", new Event("connection timeout"));
-                    if (this.#options.reconnect) this.reconnect(true);
+                    this.#emit("error", new Event("connection timeout"));
+                    if (this.#options.reconnect) this.#reconnect(true);
                 }
             }, this.#options.timeout);
         }
     }
 
-    private reconnect(immediate: boolean = false) {
+    #reconnect(immediate: boolean = false) {
         if (!this.#ws) return;
 
         if (this.#options.reconnectMaxTimes && (this.#reconnectAttempts >= this.#options.reconnectMaxTimes)) {
             throw new Error("Max reconnect attempts reached");
         }
 
-        if (this.#reconnectTimeout) clearTimeout(this.#reconnectTimeout);
+        if (this.#reconnectTimeoutTimerId) clearTimeout(this.#reconnectTimeoutTimerId);
 
         const reconnectEvent = () => {
             this.#ws = new WebSocket(this.#url, this.#options.protocols);
-            this.bindEvents();
+            this.#bindEvents();
             this.#reconnectAttempts++;
-        }
+        };
 
         if (immediate) {
-            reconnectEvent()
+            reconnectEvent();
             this.#timeoutHandle();
             return;
         }
@@ -105,39 +84,39 @@ export default class ClientWs {
         if (this.#ws.readyState === WebSocket.CONNECTING || this.#ws.readyState === WebSocket.OPEN) return;
 
         const exponentialBackoff = Math.min(this.#options.reconnectInterval * Math.pow(2, this.#reconnectAttempts), this.#options.reconnectMaxInterval);
-        this.#reconnectTimeout = setTimeout(reconnectEvent, exponentialBackoff);
+        this.#reconnectTimeoutTimerId = setTimeout(reconnectEvent, exponentialBackoff);
     }
 
-    private bindEvents() {
-        this.#ws?.addEventListener("open", this.openHandler.bind(this));
-        this.#ws?.addEventListener("close", this.closeHandler.bind(this));
-        this.#ws?.addEventListener("message", this.messageHandler.bind(this));
-        this.#ws?.addEventListener("error", this.errorHandler.bind(this));
+    #bindEvents() {
+        this.#ws?.addEventListener("open", this.#openHandler.bind(this));
+        this.#ws?.addEventListener("close", this.#closeHandler.bind(this));
+        this.#ws?.addEventListener("message", this.#messageHandler.bind(this));
+        this.#ws?.addEventListener("error", this.#errorHandler.bind(this));
     }
 
-    private openHandler(event: Event) {
+    #openHandler(event: Event) {
         if (this.#isHandleClose) this.#isHandleClose = false;
         this.#reconnectAttempts = 0;
-        this.emit("open", event);
-        this.sendCachedMessages();
+        this.#emit("open", event);
+        this.#sendCachedMessages();
     }
 
-    private closeHandler(event: CloseEvent) {
-        this.emit("close", event);
-        // 如果设置了重连,并且不是手动关闭的连接,则重连
-        if (this.#options.reconnect && !this.#isHandleClose) this.reconnect();
-    }
-
-    private errorHandler(event: Event) {
+    #errorHandler(event: Event) {
         if (this.#timeoutTimerId !== null) clearTimeout(this.#timeoutTimerId);
-        this.emit("error", event);
+        this.#emit("error", event);
     }
 
-    private messageHandler(event: MessageEvent) {
-        this.emit("message", event);
+    #closeHandler(closeEvent: CloseEvent) {
+        this.#emit("close", closeEvent);
+        // 如果设置了重连,并且不是手动关闭的连接,则重连
+        if (this.#options.reconnect && !this.#isHandleClose) this.#reconnect();
+    }
+
+    #messageHandler(messageEvent: MessageEvent) {
+        this.#emit("message", messageEvent);
         let jsonData: any;
         try {
-            jsonData = JSON.parse(event.data);
+            jsonData = JSON.parse(messageEvent.data);
         } catch {
             return;
         }
@@ -154,18 +133,18 @@ export default class ClientWs {
         }
     }
 
-    private emit(event: string, data: any) {
+    #emit(event: string, data: any) {
         const listeners = this.#eventListeners[event];
         if (listeners && listeners.length > 0) {
             listeners.forEach((listener) => listener(data));
         }
     }
 
-    on(event: "open" | "close" | "error" | "message", listener: SocketEventListener<Event>): void;
-    on(event: "close", listener: SocketEventListener<CloseEvent>): void;
-    on(event: "message", listener: SocketEventListener<MessageEvent>): void;
-    on(event: "error", listener: SocketEventListener<Event>): void;
-    on(event: "open"|"close"|"error"|"message", listener: SocketEventListener) {
+    on(event: "open" | "close" | "error" | "message", listener: (event: Event) => void): this;
+    on(event: "error", listener: (event: Event) => void): this;
+    on(event: "close", listener: (closeEvent: CloseEvent) => void): this;
+    on(event: "message", listener: (messageEvent: MessageEvent) => void): this;
+    on(event: "open" | "close" | "error" | "message", listener: Function) {
         if (["open", "close", "message", "error"].indexOf(event) === -1) {
             throw new Error(`Event "${event}" is not supported`);
         }
@@ -177,33 +156,35 @@ export default class ClientWs {
         if (!this.#eventListeners[event].includes(listener)) {
             this.#eventListeners[event].push(listener);
         }
+        return this;
     }
 
-    once(event: "open", listener: SocketEventListener<Event>): void;
-    once(event: "close", listener: SocketEventListener<CloseEvent>): void;
-    once(event: "message", listener: SocketEventListener): void;
-    once(event: "error", listener: SocketEventListener<Event>): void;
-    once(event: "open"|"close"|"error"|"message", listener: SocketEventListener) {
+    once(event: "open" | "close" | "error" | "message", listener: (event: Event) => void): this;
+    once(event: "error", listener: (event: Event) => void): this;
+    once(event: "close", listener: (closeEvent: CloseEvent) => void): this;
+    once(event: "message", listener: (messageEvent: MessageEvent) => void): this;
+    once(event: "open" | "close" | "error" | "message", listener: ((event: Event) => void) | ((closeEvent: CloseEvent) => void) | ((messageEvent: MessageEvent) => void)) {
         if (["open", "close", "message", "error"].indexOf(event) === -1) {
             throw new Error(`Event "${event}" is not supported`);
         }
 
-        const onceListener: SocketEventListener = (data) => {
+        const onceListener: any = (data: any) => {
             listener(data);
-            this.off(event, onceListener);
+            this.#off(event, onceListener);
         };
 
         this.on(event, onceListener);
+        return this;
     }
 
-    private off(event: string, listener: SocketEventListener) {
+    #off(event: string, listener: Function) {
         const listeners = this.#eventListeners[event];
         if (listeners) {
             this.#eventListeners[event] = listeners.filter((l) => l !== listener);
         }
     }
 
-    private sendCachedMessages() {
+    #sendCachedMessages() {
         let index = 0;
         const sendNextMessage = () => {
             if (index < this.#messageCache.length) {
@@ -225,9 +206,7 @@ export default class ClientWs {
             } else {
                 this.#messageCache.shift();
                 this.#messageCache.push({data, callback});
-                // console.warn(`消息缓存已满,保留最新的${this.options.maxCacheMessage}条消息`);
             }
-            // console.warn('websocket 未连接,消息已缓存,等待连接后发送,目前缓存消息数：' + this.messageCache.length + '条');
         }
 
         if (!this.#ws || this.#ws.readyState !== WebSocket.OPEN) {
@@ -264,7 +243,7 @@ export default class ClientWs {
         this.#ws?.close();
     }
 
-    removeListener(event: "open"|"close"|"error"|"message") {
+    removeListener(event: "open" | "close" | "error" | "message") {
         delete this.#eventListeners[event];
     }
 

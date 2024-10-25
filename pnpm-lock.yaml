@@ -39,6 +39,12 @@ importers:
       rollup-plugin-cleaner:
         specifier: ^1.0.0
         version: 1.0.0(rollup@4.22.4)
+      rollup-plugin-dts:
+        specifier: ^6.1.1
+        version: 6.1.1(rollup@4.22.4)(typescript@5.5.4)
+      rollup-plugin-polyfill-node:
+        specifier: ^0.13.0
+        version: 0.13.0(rollup@4.22.4)
       rollup-plugin-terser:
         specifier: ^7.0.2
         version: 7.0.2(rollup@4.22.4)
@@ -146,6 +152,15 @@ packages:
     engines: {node: '>=16.0.0 || 14 >= 14.17'}
     peerDependencies:
       rollup: ^2.68.0||^3.0.0||^4.0.0
+    peerDependenciesMeta:
+      rollup:
+        optional: true
+
+  '@rollup/plugin-inject@5.0.5':
+    resolution: {integrity: sha512-2+DEJbNBoPROPkgTDNe8/1YXWcqxbN5DTjASVIOx8HS+pITXushyNiBV56RB08zuptzz8gT3YfkqriTBVycepg==}
+    engines: {node: '>=14.0.0'}
+    peerDependencies:
+      rollup: ^1.20.0||^2.0.0||^3.0.0||^4.0.0
     peerDependenciesMeta:
       rollup:
         optional: true
@@ -856,6 +871,18 @@ packages:
     peerDependencies:
       rollup: '> 1.0'
 
+  rollup-plugin-dts@6.1.1:
+    resolution: {integrity: sha512-aSHRcJ6KG2IHIioYlvAOcEq6U99sVtqDDKVhnwt70rW6tsz3tv5OSjEiWcgzfsHdLyGXZ/3b/7b/+Za3Y6r1XA==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      rollup: ^3.29.4 || ^4
+      typescript: ^4.5 || ^5.0
+
+  rollup-plugin-polyfill-node@0.13.0:
+    resolution: {integrity: sha512-FYEvpCaD5jGtyBuBFcQImEGmTxDTPbiHjJdrYIp+mFIwgXiXabxvKUK7ZT9P31ozu2Tqm9llYQMRWsfvTMTAOw==}
+    peerDependencies:
+      rollup: ^1.20.0 || ^2.0.0 || ^3.0.0 || ^4.0.0
+
   rollup-plugin-terser@7.0.2:
     resolution: {integrity: sha512-w3iIaU4OxcF52UUXiZNsNeuXIMDvFrr+ZXK6bFZ0Q60qyVfq4uLptoS4bbq3paG3x216eQllFZX7zt6TIImguQ==}
     deprecated: This package has been deprecated and is no longer maintained. Please use @rollup/plugin-terser
@@ -1137,6 +1164,14 @@ snapshots:
       estree-walker: 2.0.2
       glob: 10.4.5
       is-reference: 1.2.1
+      magic-string: 0.30.11
+    optionalDependencies:
+      rollup: 4.22.4
+
+  '@rollup/plugin-inject@5.0.5(rollup@4.22.4)':
+    dependencies:
+      '@rollup/pluginutils': 5.1.0(rollup@4.22.4)
+      estree-walker: 2.0.2
       magic-string: 0.30.11
     optionalDependencies:
       rollup: 4.22.4
@@ -1814,6 +1849,19 @@ snapshots:
   rollup-plugin-cleaner@1.0.0(rollup@4.22.4):
     dependencies:
       rimraf: 2.7.1
+      rollup: 4.22.4
+
+  rollup-plugin-dts@6.1.1(rollup@4.22.4)(typescript@5.5.4):
+    dependencies:
+      magic-string: 0.30.11
+      rollup: 4.22.4
+      typescript: 5.5.4
+    optionalDependencies:
+      '@babel/code-frame': 7.24.7
+
+  rollup-plugin-polyfill-node@0.13.0(rollup@4.22.4):
+    dependencies:
+      '@rollup/plugin-inject': 5.0.5(rollup@4.22.4)
       rollup: 4.22.4
 
   rollup-plugin-terser@7.0.2(rollup@4.22.4):
