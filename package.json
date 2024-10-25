@@ -1,18 +1,22 @@
 {
-  "name": "@coderlzw/client-ws",
-  "version": "0.0.1-beta.1",
-  "description": "封装浏览器端的 websocket",
-  "main": "dist/index.esm.js",
-  "types": "dist/types/index.d.ts",
+  "name": "@coderlzw/ws",
+  "version": "0.0.1-1",
+  "description": "对浏览器端的 WebSocket 和 ws 库的封装的客户端操作，支持重连等操作",
   "author": "梁志伟",
   "license": "MIT",
-  "homepage": "https://github.com/coderlzw-cn/client-ws#readme",
+  "homepage": "https://github.com/coderlzw-cn/websocket#readme",
   "keywords": [
-    "websocket"
+    "websocket",
+    "ws"
   ],
+  "exports": {
+    "types": "./dist/index.d.ts",
+    "import": "./dist/index.mjs",
+    "require": "./dist/index.cjs"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/coderlzw-cn/client-ws"
+    "url": "https://github.com/coderlzw-cn/websocket"
   },
   "scripts": {
     "build": "rollup -c",
@@ -30,13 +34,20 @@
     "@eslint/js": "^9.8.0",
     "@rollup/plugin-commonjs": "^26.0.1",
     "@rollup/plugin-node-resolve": "^15.2.3",
+    "@types/node": "^22.7.9",
+    "@types/ws": "^8.5.12",
     "eslint": "~9.8.0",
     "globals": "^15.9.0",
-    "rollup": "^4.20.0",
+    "rollup": "4.22.4",
     "rollup-plugin-cleaner": "^1.0.0",
+    "rollup-plugin-dts": "^6.1.1",
+    "rollup-plugin-polyfill-node": "^0.13.0",
     "rollup-plugin-terser": "^7.0.2",
     "rollup-plugin-typescript2": "^0.36.0",
     "typescript": "^5.5.4",
     "typescript-eslint": "^8.0.1"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
   }
 }

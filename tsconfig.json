@@ -2,18 +2,19 @@
   "compilerOptions": {
     "baseUrl": ".",
     "target": "ESNext",
-    "declaration": true,
-    "declarationMap": false,
+    "declaration": true,             // 生成 .d.ts 文件
+    "declarationDir": "./dist",     // 指定 .d.ts 文件的输出目录
+    "declarationMap": true,          // 生成 .d.ts.map 文件（可选）
+    "sourceMap": true,               // 生成 .map 文件（可选）
+    "strict": true,                 // 启用所有严格类型检查选项
     "outDir": "./dist",
-    "strict": true,
     "esModuleInterop": true,
-    "declarationDir": "./dist/types",
     "lib": [
       "dom",
       "esnext"
     ],
     "allowSyntheticDefaultImports": true,
-    "removeComments": true
+    "removeComments": true,
   },
   "include": [
     "src/**/*.ts"
