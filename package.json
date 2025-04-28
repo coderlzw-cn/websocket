@@ -24,7 +24,6 @@
     "dev": "rollup -c -w",
     "lint-staged": "lint-staged"
   },
-    "private": false,
   "keywords": [
     "websocket",
     "client",
@@ -35,6 +34,10 @@
   ],
   "author": "coderlzw <coderlzw@foxmail.com>",
   "license": "MIT",
+  "private": false,
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/coderlzw-cn/websocket.git"
