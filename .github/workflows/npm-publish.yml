@@ -23,30 +23,7 @@ jobs:
           ls -al
           pnpm i
           pnpm build
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts # 构建产物名称
-          path: ./dist # 构建产物路径
-
-  publish-npm:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: https://registry.npmjs.org/
-      - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts # 构建产物名称，需与上传时的名称一致
-          path: ./ # 下载后存放路径
-      - name: List Build Directory
-        run: ls -al ./
+          npm publish
       - name: Publish to NPM
         run: npm publish
         env:
