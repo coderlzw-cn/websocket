@@ -193,7 +193,3 @@ interface ErrorInfo {
   connectionStats: ConnectionStats;
 }
 ```
-
-## 许可证
-
-MIT
