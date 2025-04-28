@@ -1,5 +1,12 @@
 # 1.0.0 (2025-04-28)
 
+
+### Features
+
+* **core:** 第一版 ([51a5422](https://github.com/coderlzw-cn/websocket/commit/51a5422a4e5df88be03c65ea6b9da4f683f1061a))
+
+# 1.0.0 (2025-04-28)
+
 ### Features
 
 - **core:** 实现 websocket class ([10f7fe4](https://github.com/coderlzw-cn/websocket/commit/10f7fe45fccdb603a5c8b7ac8448076b0bfea3a4))
