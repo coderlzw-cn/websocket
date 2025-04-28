@@ -24,6 +24,7 @@
     "dev": "rollup -c -w",
     "lint-staged": "lint-staged"
   },
+    "private": false,
   "keywords": [
     "websocket",
     "client",
