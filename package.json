@@ -1,0 +1,68 @@
+{
+  "name": "@coderlzw/websocket",
+  "version": "1.0.0",
+  "description": "A powerful WebSocket client with auto-reconnect, heartbeat, message caching, and authentication support",
+  "main": "dist/websocket.js",
+  "module": "dist/websocket.esm.js",
+  "types": "dist/websocket.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "prepare": "husky",
+    "commit": "git-cz",
+    "lint": "eslint src/**/*.ts --fix",
+    "lint:check": "eslint src/**/*.ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "build": "rollup -c",
+    "release": "semantic-release --no-ci",
+    "release:ci": "semantic-release",
+    "dev": "rollup -c -w",
+    "lint-staged": "lint-staged"
+  },
+  "keywords": [
+    "websocket",
+    "client",
+    "reconnect",
+    "heartbeat",
+    "authentication",
+    "typescript"
+  ],
+  "author": "coderlzw <coderlzw@foxmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coderlzw-cn/websocket.git"
+  },
+  "bugs": {
+    "url": "https://github.com/coderlzw-cn/websocket/issues"
+  },
+  "homepage": "https://github.com/coderlzw-cn/websocket#readme",
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
+    "@eslint/js": "^9.25.1",
+    "@eslint/json": "^0.12.0",
+    "@eslint/markdown": "^6.4.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.2",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "commitizen": "^4.3.1",
+    "cz-customizable": "^7.4.0",
+    "eslint": "^9.25.1",
+    "globals": "^16.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1",
+    "prettier": "3.5.3",
+    "rollup": "^4.40.1",
+    "rollup-plugin-delete": "^3.0.1",
+    "semantic-release": "^24.2.3",
+    "tslib": "^2.8.1",
+    "typescript-eslint": "^8.31.0"
+  }
+}
